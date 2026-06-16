@@ -38,26 +38,23 @@ st.markdown("""
 # ==========================================
 # 1. MOTORE MACHINE LEARNING
 # ==========================================
-@st.cache_data(deep=True)
+@st.cache_data
 def generate_complex_dataset() -> pd.DataFrame:
     """Genera un dataset storico avanzato basato sul dualismo Vita/Corsa"""
     np.random.seed(42)
     days = 600
     dates = pd.date_range(start="2024-01-01", periods=days)
     
-    # Dati Vita Odierna (Salute)
     sleep = np.random.normal(7.2, 1.2, days).clip(3, 10)
     hrv = np.random.normal(55, 15, days).clip(15, 100)
     spo2 = np.random.normal(97, 1.5, days).clip(90, 100)
     stress = np.random.randint(1, 10, days)
     acwr = np.random.normal(1.1, 0.3, days).clip(0.6, 2.5)
     
-    # Dati Ultimo Allenamento (Corsa)
     last_dist = np.random.normal(12, 5, days).clip(2, 42)
     last_gct = np.random.normal(220, 15, days).clip(170, 300)
     last_power = np.random.normal(260, 40, days).clip(150, 450)
     
-    # Target Odierni (Quello che vogliamo fare oggi)
     target_dist = np.random.normal(10, 4, days).clip(2, 30)
     target_rpe = np.random.randint(3, 10, days)
     
@@ -67,13 +64,9 @@ def generate_complex_dataset() -> pd.DataFrame:
         'Target_Dist': target_dist, 'Target_RPE': target_rpe
     })
     
-    # Calcolo KPI Proprietari per addestramento
     df['ISMA'] = (df['Stress'] * df['Target_RPE']) / (df['Sleep'] + 0.1)
-    
-    # Creazione logica dei target per XGBoost
     df['Pace_min_km'] = 8.5 + (df['Last_GCT'] * 0.01) - (df['Last_Power'] * 0.003) - (df['HRV'] * 0.01) + np.random.normal(0, 0.15, days)
     
-    # Rischio infortuni
     risk_prob = np.where((df['ACWR'] > 1.4) | ((df['Last_GCT'] > 250) & (df['HRV'] < 40)), 0.8, 0.05)
     df['Injury_Event'] = np.random.binomial(1, risk_prob)
     
@@ -105,31 +98,26 @@ model_pace, model_inj, feature_cols = train_models(df)
 if 'aw_synced' not in st.session_state:
     st.session_state.aw_synced = False
     st.session_state.coach_plan_generated = False
+    st.session_state.form_submitted = False
     
-    # Dati Salute (Oggi)
     st.session_state.today_sleep = 7.0
     st.session_state.today_hrv = 50.0
     st.session_state.today_spo2 = 97.0
     st.session_state.today_stress = 5
     st.session_state.today_acwr = 1.1
     
-    # Dati Ultima Corsa
     st.session_state.last_dist = 10.0
     st.session_state.last_gct = 220.0
     st.session_state.last_power = 250.0
     st.session_state.last_cadence = 165.0
     st.session_state.last_pace = "5:30"
     
-    # Target Simulatore
     st.session_state.target_dist = 8.0
     st.session_state.target_rpe = 6
 
-if 'form_submitted' not in st.session_state:
-    st.session_state.form_submitted = False
-
 
 # ==========================================
-# 3. SIDEBAR (SINCRONIZZAZIONE APPLE WATCH)
+# 3. SIDEBAR
 # ==========================================
 with st.sidebar:
     st.image("https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg", width=40)
@@ -194,14 +182,14 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 
 
 # =======================================================
-# TAB 1: INTERVISTA AI COACH (LOGICA INTERATTIVA)
+# TAB 1: INTERVISTA AI COACH
 # =======================================================
 with tab1:
     st.header("🗣️ Intervista Pre-Allenamento")
-    st.markdown("L'Intelligenza Artificiale ha letto i tuoi dati biomedici. Ora ha bisogno del tuo **feedback soggettivo** per creare la scheda di oggi.")
+    st.markdown("L'IA ha letto i tuoi dati biomedici. Ora ha bisogno del tuo **feedback soggettivo** per creare la scheda di oggi.")
     
     if not st.session_state.aw_synced:
-        st.info("Sincronizza l'Apple Watch dalla barra laterale per iniziare l'intervista.")
+        st.info("Sincronizza l'Apple Watch dalla barra laterale per iniziare.")
     else:
         col_c1, col_c2 = st.columns([1, 1])
         
@@ -209,12 +197,12 @@ with tab1:
             st.markdown("<div class='kpi-card'>", unsafe_allow_html=True)
             st.subheader("📝 Questionario Atleta")
             with st.form("coach_form", clear_on_submit=False):
-                doms = st.slider("1. Livello di indolenzimento muscolare (DOMS)?", 1, 10, 5, help="1 = Fresco come una rosa, 10 = Non riesco a camminare")
+                doms = st.slider("1. Livello di indolenzimento muscolare (DOMS)?", 1, 10, 5, help="1 = Fresco, 10 = Non riesco a camminare")
                 time_avail = st.selectbox("2. Quanto tempo hai oggi?", ["< 30 min", "45 - 60 min", "> 90 min"])
                 mentality = st.radio("3. Livello di energia mentale?", ["Scaricato/Stressato", "Normale", "Carico a molla!"])
                 goal = st.selectbox("4. Obiettivo del prossimo mese?", ["Migliorare la Resistenza", "Aumentare la Velocità", "Recupero Infortuni", "Puro Benessere"])
                 
-                submitted = st.form_submit_button("Analisa e Genera Allenamento 🚀", use_container_width=True)
+                submitted = st.form_submit_button("Analizza e Genera Allenamento 🚀", use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
             
             if submitted and not st.session_state.form_submitted:
@@ -227,25 +215,23 @@ with tab1:
                 st.subheader("📋 Referto e Prescrizione")
                 
                 if st.session_state.today_hrv < 45 and doms > 6:
-                    diag = "🚨 **SOVRACCARICO SISTEMICO RILEVATO:** Il tuo Apple Watch segnala un calo dell'HRV e tu riporti DOMS elevati."
+                    diag = "🚨 **SOVRACCARICO SISTEMICO:** HRV basso e DOMS elevati. Residui dell'ultimo lungo nei muscoli."
                     presc_dist = 5.0
                     presc_rpe = 3
                     presc_type = "Fondo Lento Rigenerativo (Z1)"
                 elif st.session_state.today_sleep > 7 and mentality == "Carico a molla!":
-                    diag = "✅ **PICCO DI FORMA:** Metriche HealthKit eccellenti e forte prontezza soggettiva."
+                    diag = "✅ **PICCO DI FORMA:** Metriche eccellenti e prontezza soggettiva. Sistema Nervoso pronto."
                     presc_dist = 12.0
                     presc_rpe = 8
                     presc_type = "Ripetute in Soglia (Interval Training)"
                 else:
-                    diag = "⚠️ **STATO INTERMEDIO:** C'è affaticamento lavorativo ma i muscoli sono discreti."
+                    diag = "⚠️ **STATO INTERMEDIO:** Affaticamento lavorativo ma muscoli discreti. Manteniamo il motore acceso."
                     presc_dist = 8.0
                     presc_rpe = 5
                     presc_type = "Corsa Continua Media (Fartlek leggero)"
 
-
                 st.session_state.target_dist = presc_dist
                 st.session_state.target_rpe = presc_rpe
-
 
                 st.markdown(f"<div class='coach-message'>{diag}</div>", unsafe_allow_html=True)
                 
@@ -255,7 +241,7 @@ with tab1:
                 c_b.metric("Distanza Consigliata", f"{presc_dist} km")
                 c_c.metric("Intensità (RPE)", f"{presc_rpe} / 10")
                 
-                st.success("👉 Ho pre-caricato questi dati nel **Simulatore ML**. Vai al Tab 2 per vedere le previsioni!")
+                st.success("👉 Dati pre-caricati nel **Simulatore ML**. Vai al Tab 2!")
         
         with col_c2:
             if not st.session_state.coach_plan_generated:
@@ -263,11 +249,11 @@ with tab1:
 
 
 # =======================================================
-# TAB 2: SIMULATORE E INFERENZA MACHINE LEARNING
+# TAB 2: SIMULATORE ML
 # =======================================================
 with tab2:
     st.header("🎛️ Simulatore Sessione XGBoost")
-    st.markdown("Qui puoi testare l'allenamento suggerito dal Coach o modificarlo per vedere come reagisce l'algoritmo.")
+    st.markdown("Testa l'allenamento suggerito o modifica per vedere come reagisce l'algoritmo.")
     
     col_s1, col_s2, col_s3 = st.columns([1,1,1])
     
@@ -286,9 +272,7 @@ with tab2:
         st.info(f"Ultimo GCT: {st.session_state.last_gct} ms")
         st.info(f"Ultima Power: {st.session_state.last_power} W")
 
-
     live_isma = (st.session_state.today_stress * st.session_state.target_rpe) / (sim_sleep + 0.1)
-
 
     input_df = pd.DataFrame({
         'Sleep': [sim_sleep], 'HRV': [sim_hrv], 'SpO2': [st.session_state.today_spo2], 
@@ -298,10 +282,8 @@ with tab2:
         'Target_RPE': [st.session_state.target_rpe], 'ISMA': [live_isma]
     })[feature_cols]
 
-
     pred_pace = model_pace.predict(input_df)[0]
     pred_risk = model_inj.predict_proba(input_df)[0][1] * 100
-
 
     st.divider()
     st.markdown("### 🧠 Risposta dell'Algoritmo (Live)")
@@ -315,11 +297,11 @@ with tab2:
         col_out2.metric("🟡 Rischio Infortuni", f"{pred_risk:.1f}%", "- Monitorare")
     else:
         col_out2.metric("🔴 Rischio Infortuni", f"{pred_risk:.1f}%", "- PERICOLO")
-        st.error("🚨 La combinazione di questo carico con il tuo attuale livello di sonno/HRV porta a un rischio clinico inaccettabile.")
+        st.error("🚨 Rischio clinico inaccettabile. Diminuisci i chilometri.")
 
 
 # =======================================================
-# TAB 3: ANALITICA E GRAFICI AVANZATI (RADAR & SCATTER)
+# TAB 3: ANALITICA & RADAR
 # =======================================================
 with tab3:
     st.header("📊 Analitica Fisiologica e Profilazione")
@@ -352,7 +334,7 @@ with tab3:
         
     with c_r2:
         st.subheader("👟 Analisi Biomeccanica (Scatter)")
-        st.markdown("Relazione storica tra **Potenza (Watt)** ed **Efficienza (GCT)**.")
+        st.markdown("Relazione tra **Potenza (Watt)** ed **Efficienza (GCT)**.")
         fig_scatter = px.scatter(
             df.tail(150), 
             x='Last_GCT', y='Last_Power', 
@@ -370,14 +352,13 @@ with tab3:
 
 
 # =======================================================
-# TAB 4: KPI PROPRIETARI E SOGLIE MEDICHE
+# TAB 4: KPI MEDICI
 # =======================================================
 with tab4:
     st.header("🎯 Monitoraggio KPI Medici")
     
     live_isma = (st.session_state.today_stress * st.session_state.target_rpe) / (st.session_state.today_sleep + 0.1)
     live_islr = (8 * st.session_state.today_stress) / (st.session_state.target_dist + 0.1)
-
 
     c_k1, c_k2 = st.columns(2)
     
@@ -395,7 +376,6 @@ with tab4:
         fig_g1.update_layout(height=300, paper_bgcolor='rgba(0,0,0,0)')
         st.plotly_chart(fig_g1, use_container_width=True)
 
-
     with c_k2:
         st.markdown("### 🟡 ISLR (Carico Lavoro/Scarico)")
         st.markdown("*(Ore Lavoro * Stress Mentale) / Distanza Corsa*")
@@ -412,11 +392,11 @@ with tab4:
 
 
 # =======================================================
-# TAB 5: ACHIEVEMENTS & GAMIFICATION
+# TAB 5: BIO-MEDAGLIE
 # =======================================================
 with tab5:
     st.header("🏆 Bio-Medaglie e Gamification")
-    st.markdown("I badge si aggiornano in tempo reale in base alla tua condizione di salute odierna.")
+    st.markdown("I badge si aggiornano in tempo reale in base alla tua salute odierna.")
     
     col_a1, col_a2, col_a3 = st.columns(3)
     
@@ -424,17 +404,16 @@ with tab5:
         if st.session_state.today_sleep >= 8:
             st.markdown("<div class='kpi-card' style='border-top: 5px solid #00f2fe;'><h3>😴 Sonno da Re</h3><p>Hai dormito almeno 8 ore.</p></div>", unsafe_allow_html=True)
         else:
-            st.markdown("<div class='kpi-card' style='opacity: 0.4;'>🔒 <i>Sonno da Re (Richiede 8h di sonno)</i></div>", unsafe_allow_html=True)
+            st.markdown("<div class='kpi-card' style='opacity: 0.4;'>🔒 <i>Sonno da Re (Richiede 8h)</i></div>", unsafe_allow_html=True)
             
     with col_a2:
         if st.session_state.today_hrv >= 60:
-            st.markdown("<div class='kpi-card' style='border-top: 5px solid #2ecc71;'><h3>💓 Cuore Elastico</h3><p>HRV superiore a 60ms.</p></div>", unsafe_allow_html=True)
+            st.markdown("<div class='kpi-card' style='border-top: 5px solid #2ecc71;'><h3>💓 Cuore Elastico</h3><p>HRV > 60ms.</p></div>", unsafe_allow_html=True)
         else:
-            st.markdown("<div class='kpi-card' style='opacity: 0.4;'>🔒 <i>Cuore Elastico (Richieder HRV > 60ms)</i></div>", unsafe_allow_html=True)
-
+            st.markdown("<div class='kpi-card' style='opacity: 0.4;'>🔒 <i>Cuore Elastico (HRV > 60ms)</i></div>", unsafe_allow_html=True)
 
     with col_a3:
         if st.session_state.last_gct <= 215:
-            st.markdown("<div class='kpi-card' style='border-top: 5px solid #f1c40f;'><h3>⚡ Gazzella</h3><p>GCT inferiore a 215ms.</p></div>", unsafe_allow_html=True)
+            st.markdown("<div class='kpi-card' style='border-top: 5px solid #f1c40f;'><h3>⚡ Gazzella</h3><p>GCT < 215ms.</p></div>", unsafe_allow_html=True)
         else:
-            st.markdown("<div class='kpi-card' style='opacity: 0.4;'>🔒 <i>Gazzella (Richiede GCT < 215ms)</i></div>", unsafe_allow_html=True)
+            st.markdown("<div class='kpi-card' style='opacity: 0.4;'>🔒 <i>Gazzella (GCT < 215ms)</i></div>", unsafe_allow_html=True)
