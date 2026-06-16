@@ -1,4 +1,3 @@
-%%writefile app.py
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -27,7 +26,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 1. MOTORE DATI E MACHINE LEARNING
+# 1. MOTORE DATI E MACHINE LEARNING (CACHE PER CLOUD)
 # ==========================================
 @st.cache_data
 def load_historical_data() -> pd.DataFrame:
@@ -51,12 +50,10 @@ def load_historical_data() -> pd.DataFrame:
         'ACWR': np.random.normal(1.1, 0.3, days).clip(0.5, 2.5)
     })
     
-    # Calcolo KPI
     df['ISMA'] = np.round((df['Stress_Level'] * df['RPE']) / (df['Sleep_Hours'] + 0.1), 2)
     df['ISLR'] = np.round((8 * df['Stress_Level']) / (df['Distance_km'] + 0.1), 2)
     df['IITR'] = np.round((22 * 10) / (df['Distance_km'] + 0.1), 2)
     
-    # Target: Pace e Rischio Infortuni
     df['Pace_min_km'] = 9.0 - (df['Cadence_spm'] * 0.015) - (df['Running_Power_W'] * 0.002) + (df['GCT_ms'] * 0.005) + np.random.normal(0, 0.1, days)
     injury_prob = np.where((df['ACWR'] > 1.4) | (df['GCT_ms'] > 260) | (df['SpO2_pct'] < 94), 0.75, 0.05)
     df['Injury_Event'] = np.random.binomial(1, injury_prob)
@@ -133,16 +130,13 @@ with tab1:
         st.session_state.sim_power = st.number_input("Potenza Corsa (Watt)", 100.0, 500.0, st.session_state.sim_power)
         st.session_state.sim_stress = st.slider("Stress Lavorativo/Mentale", 1, 10, st.session_state.sim_stress)
         
-    # Variabili fisse o derivate per questa simulazione
     st.session_state.sim_cadence = 170.0
     st.session_state.sim_elev = 150.0
 
-    # 1. CALCOLO KPI IN TEMPO REALE
     live_isma = (st.session_state.sim_stress * st.session_state.sim_rpe) / (st.session_state.sim_sleep + 0.1)
     live_islr = (8 * st.session_state.sim_stress) / (st.session_state.sim_dist + 0.1)
     live_iitr = (22 * 10) / (st.session_state.sim_dist + 0.1)
 
-    # 2. ESECUZIONE ML (XGBOOST) IN TEMPO REALE
     input_dict = {
         'Distance_km': [st.session_state.sim_dist], 'Avg_BPM': [145], 'Cadence_spm': [st.session_state.sim_cadence], 
         'Elevation_m': [st.session_state.sim_elev], 'Sleep_Hours': [st.session_state.sim_sleep], 
@@ -192,7 +186,6 @@ with tab2:
         fig.update_layout(height=320, margin=dict(l=20, r=20, t=40, b=20), paper_bgcolor='rgba(0,0,0,0)')
         return fig
 
-    # Medie storiche per le soglie
     m_isma = df['ISMA'].mean(); s_isma = df['ISMA'].std()
     m_islr = df['ISLR'].mean(); s_islr = df['ISLR'].std()
     
@@ -207,7 +200,6 @@ with tab3:
     st.header("🤖 Referto Tecnico e Analisi (Sports Science)")
     st.markdown(f"*(Il Coach sta analizzando i dati per la tua sessione da **{st.session_state.sim_dist} km** a RPE **{st.session_state.sim_rpe}**)*")
     
-    # 1. ANALISI SISTEMA NERVOSO E SONNO
     st.subheader("🧠 1. Sistema Nervoso e Readiness")
     if st.session_state.sim_sleep < 6.0 and st.session_state.sim_hrv < 40:
         st.markdown(f"<div class='coach-alert-red'><b>🚨 SOVRACCARICO PARASIMPATICO:</b> Il combinato disposto di sonno carente ({st.session_state.sim_sleep}h) e HRV depresso ({st.session_state.sim_hrv}ms) indica una forte inibizione del recupero. Il tuo Sistema Nervoso Centrale è esaurito. <b>Azione Coach:</b> Veto assoluto sui lavori di qualità. Si prescrive categoricamente riposo passivo o 20 min di recovery attivo (Z1 cardiaca).</div>", unsafe_allow_html=True)
@@ -216,7 +208,6 @@ with tab3:
     else:
         st.markdown(f"<div class='coach-alert-yellow'><b>⚠️ RECUPERO INCOMPLETO (ZONA GRIGIA):</b> I parametri sono intermedi. <b>Azione Coach:</b> Puoi affrontare la sessione, ma implementa la regola del 'Cardiac Drift'. Se i battiti salgono del 10% a parità di Pace nella seconda metà dell'allenamento, interrompi l'intensità.</div>", unsafe_allow_html=True)
 
-    # 2. ANALISI BIOMECCANICA APPLE WATCH
     st.subheader("🦶 2. Dinamiche di Corsa e Biomeccanica")
     if st.session_state.sim_gct > 250:
         st.markdown(f"<div class='coach-alert-red'><b>🚨 DEFICIT ELASTICO (GCT Alto):</b> Un Tempo di Contatto al Suolo di {st.session_state.sim_gct}ms è critico. La stiffness dei tendini d'Achille è crollata: stai 'affondando' nel terreno assorbendo energia eccentrica dannosa. <b>Azione Coach:</b> Altissimo rischio di infortunio al ginocchio o fascite plantare. Inserisci andature (plyometrics) nel riscaldamento e riduci i chilometri del 30%.</div>", unsafe_allow_html=True)
@@ -225,7 +216,6 @@ with tab3:
     else:
         st.markdown(f"<div class='coach-alert-green'><b>✅ EFFICIENZA MECCANICA:</b> Il rapporto tra Potenza espressa ({st.session_state.sim_power}W) e tempo di contatto è bilanciato. La cinematica della corsa è in zona di totale sicurezza.</div>", unsafe_allow_html=True)
 
-    # 3. VERDETTO FINALE METABOLICO
     st.subheader("⚖️ 3. Verdetto Prescrittivo")
     if pred_risk > 60 or live_isma > (m_isma + s_isma * 1.5):
         st.error(f"❌ VETO MEDICO: Rischio infortunio/sovraccarico al {pred_risk:.1f}%. I tuoi indici metabolici (ISMA) e biomeccanici non supportano l'RPE {st.session_state.sim_rpe} pianificato. Riposare oggi significa andare più veloci domani.")
@@ -258,30 +248,26 @@ with tab4:
 # ==========================================
 with tab5:
     st.header("🏆 Gamification & Bio-Medaglie")
-    st.markdown("I premi si sbloccano o bloccano **in base ai dati che inserisci nel simulatore.** (Prova a modificare le ore di sonno o il GCT!)")
+    st.markdown("I premi si sbloccano o bloccano **in base ai dati che inserisci nel simulatore.**")
     
     col_a1, col_a2 = st.columns(2)
     with col_a1:
-        # Controllo sul Sonno
         if st.session_state.sim_sleep >= 8:
             st.markdown("<div class='kpi-box' style='background: linear-gradient(135deg, #4facfe, #00f2fe); color: white;'><h3 style='margin:0;'>😴 Maestro del Riposo</h3><p>Sonno ottimale rilevato stanotte (>8h). Il corpo ringrazia.</p></div>", unsafe_allow_html=True)
         else:
             st.markdown("<div class='kpi-box' style='opacity: 0.5;'>🔒 <i>Maestro del Riposo (Richiede 8h di sonno)</i></div>", unsafe_allow_html=True)
             
-        # Controllo sul GCT
         if st.session_state.sim_gct <= 210:
             st.markdown("<div class='kpi-box' style='background: linear-gradient(135deg, #00b09b, #96c93d); color: white;'><h3 style='margin:0;'>⚡ Reattività Elastica</h3><p>GCT sotto i 210ms. Efficienza meccanica da élite.</p></div>", unsafe_allow_html=True)
         else:
             st.markdown("<div class='kpi-box' style='opacity: 0.5;'>🔒 <i>Reattività Elastica (Richiede GCT <= 210ms)</i></div>", unsafe_allow_html=True)
             
     with col_a2:
-        # Controllo sull'ISMA
         if live_isma < 10:
             st.markdown("<div class='kpi-box' style='background: linear-gradient(135deg, #f093fb, #f5576c); color: white;'><h3 style='margin:0;'>🧘 Zen Master</h3><p>ISMA bassissimo. Assenza totale di stress metabolico.</p></div>", unsafe_allow_html=True)
         else:
             st.markdown("<div class='kpi-box' style='opacity: 0.5;'>🔒 <i>Zen Master (Richiede ISMA < 10)</i></div>", unsafe_allow_html=True)
 
-        # Controllo sul Rischio
         if pred_risk < 15:
             st.markdown("<div class='kpi-box' style='background: linear-gradient(135deg, #FFD700, #FDB931); color: white;'><h3 style='margin:0;'>🛡️ Antifragile</h3><p>Rischio infortunio bassissimo calcolato dall'IA (<15%).</p></div>", unsafe_allow_html=True)
         else:
