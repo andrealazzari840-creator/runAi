@@ -1,8 +1,3 @@
-# Installa dipendenze
-!pip install streamlit pandas numpy plotly xgboost -q
-
-# Crea app.py
-%%writefile app.py
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -13,11 +8,9 @@ warnings.filterwarnings('ignore')
 
 st.set_page_config(page_title="Apple Watch AI Analytics", layout="wide")
 
-# Stato sessione
 if 'aw_connected' not in st.session_state:
     st.session_state.aw_connected = False
 
-# Dati Apple Watch
 @st.cache_data
 def load_data():
     np.random.seed(42)
@@ -48,7 +41,6 @@ def load_data():
 
 df = load_data()
 
-# Modelli XGBoost
 @st.cache_resource
 def train_models(data):
     features = ['Distance_km', 'Avg_BPM', 'Max_BPM', 'Cadence_spm', 'Elevation_m', 'Sleep_Hours', 'HRV_ms', 'RPE', 'ACWR']
@@ -64,7 +56,6 @@ def train_models(data):
 
 xgb_perf, xgb_inj, feature_cols = train_models(df)
 
-# UI
 st.title("⌚ Apple Watch & AI Prediction")
 
 st.sidebar.header("🔗 Sincronizzazione")
@@ -130,11 +121,3 @@ with tab3:
         imp_perf = pd.DataFrame({'Param': feature_cols, 'Importanza': xgb_perf.feature_importances_}).sort_values('Importanza')
         fig_perf = px.bar(imp_perf, x='Importanza', y='Param', orientation='h', color='Importanza')
         st.plotly_chart(fig_perf, use_container_width=True)
-
-# Avvia l'app
-!streamlit run app.py --server.headless true &
-
-import time
-time.sleep(3)
-
-!lt --port 8501
